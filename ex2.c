@@ -16,18 +16,13 @@ int main()
                     "-l",
                     NULL}; // Vetor de argumentos
     process_id = fork();   // Criação do processo filho
-
-    switch (process_id) // Switch para a verificação do processo filho
-                        // Utilizamos o switch para testar contra o if
-    {
-    case 0:
-        execvp(linux_command, args); // Executa o comando (ls com os argumentos ls, -l, null)
-        break;
-
-    default:
+    
+    if(!process_id){ // Verificação do processo filho
+        execvp(linux_command, args); // Executa o comando (ls com os argumentos ls, -l, null)       // Utilizamos o switch para testar contra o if
+    }else{
         wait(NULL); // Código para aguardar a finalização do filho
-        break;
     }
+    
     printf("Finalizado");
 
     sleep(10);
