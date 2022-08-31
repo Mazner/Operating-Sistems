@@ -40,6 +40,7 @@ int verifica_vetor(int x, int j, int quantidade,int numero_procurado,int* vetor)
             return 1;
         }
     }
+return 0;
 }
 
 int main()
