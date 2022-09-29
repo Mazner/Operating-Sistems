@@ -1,121 +1,229 @@
-#include <stdio.h>
+#include <stdio.h> 
 #include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include "matriz.h"
 
-#define QTD_FILHOS 2
-#define VET_SIZE 11
-#define SEARCH_FOR 63
+// Defines
+#define NUMERO_DE_THREADS 5
 
-int *cria_vetor_aleatorio(int size) // Função que cria um vetor com valores aleatórios
-{
-    int *vetor = (int *)malloc(sizeof(int) * size);
-    for (int i = 0; i < size; i++)
-    {
-        vetor[i] = rand() % 100 + 1;
-    }
-    return vetor;
-}
+// Variaveis Globais
+int** matriz; //matriz global
 
-void imprime_vetor(int size, int *vetor) // Função que imprime o vetor
-{
-    for (int i = 0; i < size; i++)
-    {
-        if (i == size - 1)
-        {
-            printf("%d\n", vetor[i]);
-        }
-        else
-        {
-            printf("%d - ", vetor[i]);
-        }
-    }
-}
+int rows = 6;       //linhas
+int cols = 8;       //colunas
 
-int verifica_vetor(int x, int j, int quantidade,int numero_procurado,int* vetor)
-{
-    for (j = x; j < x + quantidade; j++)
-    {
-        if (vetor[j] == numero_procurado)
-        {
-            printf("O valor %d foi encontrado na posicao %d do vetor\n", numero_procurado, j);
-            return 1;
-        }
-    }
-return 0;
-}
+float* medias;
+int* medianas;
 
-int main()
-{
-    int *vetor = cria_vetor_aleatorio(20);
+// Estrutura
+typedef struct {
+    int id;
+    int qtd;
+} Dados;
 
-    imprime_vetor(VET_SIZE, vetor);
+// Declaração das funções
+void* media_thread(void* parametro);
+void selectionSort(int* vetor, int tamanho);
+void* mediana_thread(void* parametro);
 
-    int quantidade = VET_SIZE / QTD_FILHOS; // quantidade de elementos para cada filho
-    int resto = VET_SIZE % QTD_FILHOS;      // Caso haja resto, ele terá de ser colocado em algum filho
+int main(){
 
-    // int* teste = cria_vetor_aleatorio(QTD_FILHOS);
+    int op;
 
-    // Declaração das variáveis
+    pthread_t threads[NUMERO_DE_THREADS];
+    Dados dados[NUMERO_DE_THREADS];
 
-    pid_t pid, pid2;
-    int status = 0;
-    int searched_number = SEARCH_FOR;
-    int i = 0, j = 0, x = 0;
-    int controle_quantidade = 0;
+    do{
+        printf("Escolha o que você quer fazer!:\n[1] - Gerar Matriz\n[2] - Carregar Matriz\n");
+        scanf("%d", &op);
+    } while(op != 1 && op != 2);
 
-    pid = getpid();
 
-    for (i = 0; i < QTD_FILHOS & pid != 0; ++i) 
-    {
-        pid = fork();   //Cria o processo filho
+    // Gerar ou cvetoregar a matriz
+    if (op == 1){
 
-        if (pid >= 0)   
-        {
-            if (pid == 0)
-            {
-                if (i < resto)  //dividindo as partes para os filhos
-                {
-                    controle_quantidade = quantidade + 1;
-                }
-                else
-                {
-                    controle_quantidade = quantidade;
-                }
+        printf("Qual o numero de linhas?\n> ");
+        scanf("%d", &rows);
+        printf("Qual o numero de colunas?\n> ");
+        scanf("%d", &cols);
 
-                if (i < resto)
-                {
-                    x = i * (quantidade);       //Calcula a posição de início
-                }
-                else
-                {
-                    x = i * controle_quantidade + resto; //Coloca o valor do resto no filho (caso tenha resto)
-                }
+        matriz = create_matrix(rows, cols);
+        srand(time(NULL));  //Time para criar numeros aleatorios sempre
+        generate_elements(matriz, rows, cols, 99);
 
-                verifica_vetor(x, j, controle_quantidade, searched_number, vetor); //Cada filho verifica o vetor com suas respectivas instruções
-                return 0;
-            }
-        }
-        else
-        {
-            printf("ERRO NA CRIAÇÃO DO PROCESSO FILHO\n");
-            return -1;
-        }
+    } else{
+        matriz = read_matrix_from_file("data_matrix.in", &rows, &cols);
     }
 
-    // Verifica qual filho encontrou o valor procurado
-    if (pid)
-    {
-        x = 0;
+    // Inicio da contagem de clock
+    clock_t start = clock();
 
-        do
-        {
-            pid2 = wait(&status);
-            if (WEXITSTATUS(status) != 0)
-            {
-                printf("Olha so! O filho %d encontrou o valor, parabens!\n", pid2);
-            }
-            x++;
-        } while (x < QTD_FILHOS);
+    printf("\nNumero de Threads: %d\n", NUMERO_DE_THREADS);
+    printf("\nMatriz [%d x %d]\n\n", rows, cols);
+
+
+
+    printf("        Media:      \n");
+
+    float resultados_obtidos_media[cols];
+    for(int i = 0; i < cols; i++){
+        resultados_obtidos_media[i] = 0;
     }
+    medias = resultados_obtidos_media;
+
+    //Divisão das colunas para o exercío 2
+    int quant = cols / NUMERO_DE_THREADS;
+    int qnt_aux = cols % NUMERO_DE_THREADS;
+    int aux = 0;
+
+    for(int i = 0; i < NUMERO_DE_THREADS; i++){
+        if(i < qnt_aux){
+            dados[i].qtd = quant + 1;
+        } else{
+            dados[i].qtd = quant;
+        }
+        dados[i].id = i;
+
+        printf("Thread de numero %d: %d colunas\n", i, dados[i].qtd);
+    }
+    printf("\n");
+
+    print_matrix(matriz, rows, cols);
+
+    for(int i = 0; i < NUMERO_DE_THREADS; i++){
+        pthread_create(&threads[i], NULL, media_thread, (void*) &dados[i]);
+    }
+    
+    for(int i = 0; i < NUMERO_DE_THREADS; i++){
+        pthread_join(threads[i], NULL);
+    }
+
+    printf("Mediana:\n");
+    quant = rows / NUMERO_DE_THREADS;
+    qnt_aux = rows % NUMERO_DE_THREADS;
+    aux = 0;
+
+    for(int i = 0; i < NUMERO_DE_THREADS; i++){
+        if(i < qnt_aux){
+            dados[i].qtd = quant + 1;
+        } else{
+            dados[i].qtd = quant;
+        }
+        dados[i].id = i;
+
+        printf("Thread %d: %d linhas\n", i, dados[i].qtd);
+    }
+
+    int matriz_copia[rows][cols];
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            matriz_copia[i][j] = matriz[i][j];
+        }
+    }
+    //Ordenação através do algoritmo do Selection Sort (ed1)
+    for(int i = 0; i < rows; i++){
+        selectionSort(matriz[i], cols);
+    }
+    print_matrix(matriz, rows, cols);
+
+    // Inicializando o vetor
+    int resultado_medianas[rows];
+    for(int i = 0; i < rows; i++){
+        resultado_medianas[i] = 0;
+    }
+    medianas = resultado_medianas;
+
+    for(int i = 0; i < NUMERO_DE_THREADS; i++){
+        pthread_create(&threads[i], NULL, mediana_thread, (void*) &dados[i]);
+    }
+
+    
+    for(int i = 0; i < NUMERO_DE_THREADS; i++){
+        pthread_join(threads[i], NULL);
+    }
+
+    
+    
+    printf("\nA Mediana calculada é: ");
+    for(int i=0; i<rows;i++){
+        printf(" [%d]", resultado_medianas[i]);
+    }
+    printf("\n");
+
+    printf("\nMedia: ");
+    for(int i=0; i<cols;i++){
+        printf(" [%.2f]", medias[i]);
+    }
+    printf("\n");
+
+    //Salvando num arquivo de saída
+    FILE* arq_result = fopen("results.txt", "w");
+
+    fprintf(arq_result, "Mediana: ");
+    for(int i=0; i<rows;i++){
+        fprintf(arq_result, " [%d]", resultado_medianas[i]);
+    }
+    fprintf(arq_result, "\n");
+
+    fprintf(arq_result, "Media: ");
+    for(int i=0; i<cols;i++){
+        fprintf(arq_result, " [%.2f]", medias[i]);
+    }
+    fprintf(arq_result, "\n");
+
+    printf("\nResultados salvos com sucesso!\n");
+
+    fclose(arq_result);
+
+    // Fim da contagem de tempo
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+
+    printf("\nTempo gasto: %f segundos\n", time_spent);
 
     return 0;
+}
+
+
+
+void *media_thread(void *parametro){
+    Dados *dados = (Dados*) parametro;
+
+    int inicio = dados->id * dados->qtd;
+    int fim = inicio + dados->qtd;
+
+    for(int i = inicio; i < fim; i++){
+        for(int j = 0; j < rows; j++){
+            medias[i] += (float)matriz[j][i]/ (float)rows;
+        }
+        //printf("Coluna %d: %f\n", i, medias[i]);
+    }
+}
+
+
+void selectionSort(int vetor[], int n){
+    int i, j, min_idx;
+    for (i = 0; i < n-1; i++){
+        min_idx = i;
+        for (j = i+1; j < n; j++)
+          if (vetor[j] < vetor[min_idx]) min_idx = j;
+        // Swap 
+        vetor[min_idx] = vetor[min_idx] + vetor[i]-(vetor[i]=vetor[min_idx]);
+    }
+}
+
+void *mediana_thread(void *parametro){
+    Dados *dados = (Dados*)parametro;
+
+    int inicio = dados->id * dados->qtd;
+    int fim = inicio + dados->qtd;
+
+
+    for(int i = inicio; i < fim; i++){
+        medianas[i] = matriz[i][(int)ceil(cols/2)];
+    }
+    
 }

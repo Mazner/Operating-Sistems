@@ -1,11 +1,15 @@
-ex1:
-	gcc ex1.c -o ex1
-	./ex1
+ex01:
+	gcc ex01.c -o ex01 -lpthread
+	./ex01
 
-ex2:
-	gcc ex2.c -o ex2
-	./ex2
+ex02:
+	gcc ex02.c -o ex02 -lpthread
+	./ex02
 
-ex3:
-	gcc ex3.c -o ex3
-	./ex3
+ex03:
+	gcc -g ex03.c matriz.c -o ex03 -lpthread
+	./ex03	
+
+clear:
+	rm -f *.o
+	rm -f ex01 ex02 ex03
